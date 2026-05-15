@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>HDReader v0.7</title>
+    <title>HDReader v0.7.1</title>
     <style>
         body, html {
             margin: 0; padding: 0; width: 100%; min-height: 100vh;
@@ -15,14 +15,16 @@
         header { margin-top: 10vh; text-align: center; width: 90%; max-width: 600px; }
         h1 { font-weight: 200; letter-spacing: 4px; color: #eaa2ff; text-transform: uppercase; margin-bottom: 30px; }
         
-        /* 新增：API Key 輸入框的玻璃擬態風格 */
+        /* 1. 調整輸入框與按鈕寬度一致以達到視覺平衡 */
         .setup-container {
-            margin-bottom: 30px; display: flex; flex-direction: column; align-items: center; width: 100%;
+            margin-bottom: 20px; display: flex; flex-direction: column; align-items: center; width: 100%;
         }
         .setup-container input {
-            padding: 12px 20px; border-radius: 50px; border: 1px solid rgba(255,255,255,0.15);
+            width: 320px; /* 固定寬度 */
+            box-sizing: border-box;
+            padding: 18px 20px; border-radius: 50px; border: 1px solid rgba(255,255,255,0.15);
             background: rgba(255,255,255,0.05); color: #81fffb; font-family: monospace; text-align: center;
-            outline: none; width: 80%; max-width: 300px; backdrop-filter: blur(10px);
+            outline: none; backdrop-filter: blur(10px);
             transition: all 0.3s ease; letter-spacing: 1px;
         }
         .setup-container input:focus {
@@ -32,10 +34,15 @@
         }
         .setup-container input::placeholder { color: rgba(255,255,255,0.3); letter-spacing: 0px; }
 
-        .upload-btn-wrapper { position: relative; overflow: hidden; display: inline-block; }
+        .upload-btn-wrapper { 
+            position: relative; overflow: hidden; display: inline-block; 
+            width: 320px; /* 與輸入框寬度一致 */
+        }
         .btn {
+            width: 100%; /* 填滿 wrapper */
+            box-sizing: border-box;
             border: 1px solid rgba(255,255,255,0.4); color: #fff; background-color: rgba(255,255,255,0.05);
-            padding: 20px 60px; border-radius: 50px; font-size: 0.9rem; font-weight: 300;
+            padding: 18px 0; border-radius: 50px; font-size: 0.9rem; font-weight: 300;
             cursor: pointer; transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1); letter-spacing: 3px;
             backdrop-filter: blur(10px);
         }
@@ -62,7 +69,8 @@
 
         @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
 
-        .column { flex: 1; display: flex; flex-direction: column; gap: 15px; }
+        /* 2. 調整每筆資料（卡片）的上下間距為 20px */
+        .column { flex: 1; display: flex; flex-direction: column; gap: 20px; }
         
         .column h2 { 
             text-align: center; font-size: 1rem; margin-top: 0; letter-spacing: 3px; font-weight: 400;
@@ -125,20 +133,17 @@
         let chartDatabase = {};
         const statusText = document.getElementById('status');
         
-        // 抓取 DOM 元素
         const apiKeyInput = document.getElementById('api-key');
         const uploadInput = document.getElementById('image-upload');
         const resultsContainer = document.getElementById('results');
         const designList = document.getElementById('design-list');
         const personalityList = document.getElementById('personality-list');
 
-        // 網頁載入時，檢查是否有存過的 API Key 並自動填入
         const savedKey = localStorage.getItem('gemini_api_key');
         if (savedKey) {
             apiKeyInput.value = savedKey;
         }
 
-        // --- 載入外部資料庫 ---
         fetch('./chartDatabase.json')
             .then(response => {
                 if (!response.ok) throw new Error("JSON file not found");
@@ -156,18 +161,14 @@
 
         uploadInput.addEventListener('change', async (e) => {
             const file = e.target.files[0];
-            
-            // 每次上傳時即時抓取輸入框的 Key
             const currentApiKey = apiKeyInput.value.trim();
 
             if (!currentApiKey) {
                 alert("Please enter a valid API Key!");
-                // 清空檔案選擇，讓使用者可以重新觸發 change 事件
                 uploadInput.value = ''; 
                 return;
             }
 
-            // 儲存有效的 Key 到本地端
             localStorage.setItem('gemini_api_key', currentApiKey);
             
             if (!file) return;
@@ -188,7 +189,6 @@
                 const base64Data = base64Image.split(',')[1];
                 const mimeType = file.type;
 
-                // 使用使用者輸入的 currentApiKey
                 const listUrl = `https://generativelanguage.googleapis.com/v1beta/models?key=${currentApiKey}`;
                 const listResponse = await fetch(listUrl);
                 
