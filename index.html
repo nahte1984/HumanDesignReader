@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>HDReader v0.6.3</title>
+    <title>HDReader v0.7</title>
     <style>
         body, html {
             margin: 0; padding: 0; width: 100%; min-height: 100vh;
@@ -13,8 +13,25 @@
         }
 
         header { margin-top: 10vh; text-align: center; width: 90%; max-width: 600px; }
-        h1 { font-weight: 200; letter-spacing: 4px; color: #eaa2ff; text-transform: uppercase; margin-bottom: 40px; }
+        h1 { font-weight: 200; letter-spacing: 4px; color: #eaa2ff; text-transform: uppercase; margin-bottom: 30px; }
         
+        /* 新增：API Key 輸入框的玻璃擬態風格 */
+        .setup-container {
+            margin-bottom: 30px; display: flex; flex-direction: column; align-items: center; width: 100%;
+        }
+        .setup-container input {
+            padding: 12px 20px; border-radius: 50px; border: 1px solid rgba(255,255,255,0.15);
+            background: rgba(255,255,255,0.05); color: #81fffb; font-family: monospace; text-align: center;
+            outline: none; width: 80%; max-width: 300px; backdrop-filter: blur(10px);
+            transition: all 0.3s ease; letter-spacing: 1px;
+        }
+        .setup-container input:focus {
+            border-color: rgba(234, 162, 255, 0.5);
+            box-shadow: 0 0 20px rgba(234, 162, 255, 0.2);
+            background: rgba(255,255,255,0.08);
+        }
+        .setup-container input::placeholder { color: rgba(255,255,255,0.3); letter-spacing: 0px; }
+
         .upload-btn-wrapper { position: relative; overflow: hidden; display: inline-block; }
         .btn {
             border: 1px solid rgba(255,255,255,0.4); color: #fff; background-color: rgba(255,255,255,0.05);
@@ -82,6 +99,10 @@
     <header>
         <h1>🔮 🔮 🔮</h1>
         
+        <div class="setup-container">
+            <input type="password" id="api-key" placeholder="Enter Gemini API Key">
+        </div>
+
         <div class="upload-btn-wrapper">
             <button class="btn">SELECT CHART</button>
             <input type="file" id="image-upload" accept="image/*" />
@@ -101,14 +122,23 @@
     </div>
 
     <script>
-        // --- 請將你的 API Key 填入下方的引號內 ---
-        const API_KEY = "AIzaSyAs8XYGudmD3ey0_G96-9J_4XVBfN5nK7E"; 
-
-        // 建立一個空的資料庫容器
         let chartDatabase = {};
         const statusText = document.getElementById('status');
+        
+        // 抓取 DOM 元素
+        const apiKeyInput = document.getElementById('api-key');
+        const uploadInput = document.getElementById('image-upload');
+        const resultsContainer = document.getElementById('results');
+        const designList = document.getElementById('design-list');
+        const personalityList = document.getElementById('personality-list');
 
-        // --- 網頁載入時，先去抓取同一資料夾下的 chartDatabase.json ---
+        // 網頁載入時，檢查是否有存過的 API Key 並自動填入
+        const savedKey = localStorage.getItem('gemini_api_key');
+        if (savedKey) {
+            apiKeyInput.value = savedKey;
+        }
+
+        // --- 載入外部資料庫 ---
         fetch('./chartDatabase.json')
             .then(response => {
                 if (!response.ok) throw new Error("JSON file not found");
@@ -124,16 +154,24 @@
                 statusText.style.color = "#ff4d4d";
             });
 
-        const uploadInput = document.getElementById('image-upload');
-        const resultsContainer = document.getElementById('results');
-        const designList = document.getElementById('design-list');
-        const personalityList = document.getElementById('personality-list');
-
         uploadInput.addEventListener('change', async (e) => {
             const file = e.target.files[0];
+            
+            // 每次上傳時即時抓取輸入框的 Key
+            const currentApiKey = apiKeyInput.value.trim();
+
+            if (!currentApiKey) {
+                alert("Please enter a valid API Key!");
+                // 清空檔案選擇，讓使用者可以重新觸發 change 事件
+                uploadInput.value = ''; 
+                return;
+            }
+
+            // 儲存有效的 Key 到本地端
+            localStorage.setItem('gemini_api_key', currentApiKey);
+            
             if (!file) return;
 
-            // 如果資料庫還沒載入成功，擋下操作並提醒
             if (Object.keys(chartDatabase).length === 0) {
                 alert("資料庫尚未載入完成或發生錯誤。請確認有開啟 Local Server！");
                 return;
@@ -150,9 +188,14 @@
                 const base64Data = base64Image.split(',')[1];
                 const mimeType = file.type;
 
-                // 1. 自動探索模型
-                const listUrl = `https://generativelanguage.googleapis.com/v1beta/models?key=${API_KEY}`;
+                // 使用使用者輸入的 currentApiKey
+                const listUrl = `https://generativelanguage.googleapis.com/v1beta/models?key=${currentApiKey}`;
                 const listResponse = await fetch(listUrl);
+                
+                if (!listResponse.ok) {
+                    throw new Error("Invalid API Key or Permission denied.");
+                }
+                
                 const listData = await listResponse.json();
 
                 if (!listData.models) throw new Error("Invalid API Key or Permission denied.");
@@ -162,8 +205,7 @@
                 
                 const modelName = targetModel.name;
 
-                // 2. 發送分析請求
-                const url = `https://generativelanguage.googleapis.com/v1beta/${modelName}:generateContent?key=${API_KEY}`;
+                const url = `https://generativelanguage.googleapis.com/v1beta/${modelName}:generateContent?key=${currentApiKey}`;
                 
                 const prompt = `Extract exactly 13 numbers from the left column (Design, Red) and 13 from the right (Personality, Black). Return ONLY JSON: {"design": ["XX.X", ...], "personality": ["XX.X", ...]}`;
 
@@ -187,7 +229,6 @@
                 const cleanJsonStr = textResult.replace(/```json/g, '').replace(/```/g, '').trim();
                 const parsedData = JSON.parse(cleanJsonStr);
 
-                // 3. 渲染卡片並對接外部讀取的資料庫
                 renderCards(designList, parsedData.design);
                 renderCards(personalityList, parsedData.personality);
                 
