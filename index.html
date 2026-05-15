@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>HDReader v0.7.1</title>
+    <title>HDReader v0.7.2</title>
     <style>
         body, html {
             margin: 0; padding: 0; width: 100%; min-height: 100vh;
@@ -15,14 +15,14 @@
         header { margin-top: 10vh; text-align: center; width: 90%; max-width: 600px; }
         h1 { font-weight: 200; letter-spacing: 4px; color: #eaa2ff; text-transform: uppercase; margin-bottom: 30px; }
         
-        /* 1. 調整輸入框與按鈕寬度一致以達到視覺平衡 */
+        /* 1. 調整輸入框與按鈕寬高絕對一致 */
         .setup-container {
             margin-bottom: 20px; display: flex; flex-direction: column; align-items: center; width: 100%;
         }
         .setup-container input {
-            width: 320px; /* 固定寬度 */
-            box-sizing: border-box;
-            padding: 18px 20px; border-radius: 50px; border: 1px solid rgba(255,255,255,0.15);
+            width: 320px; height: 60px; /* 固定寬高 */
+            box-sizing: border-box; font-size: 1rem;
+            padding: 0 20px; border-radius: 50px; border: 1px solid rgba(255,255,255,0.15);
             background: rgba(255,255,255,0.05); color: #81fffb; font-family: monospace; text-align: center;
             outline: none; backdrop-filter: blur(10px);
             transition: all 0.3s ease; letter-spacing: 1px;
@@ -36,18 +36,19 @@
 
         .upload-btn-wrapper { 
             position: relative; overflow: hidden; display: inline-block; 
-            width: 320px; /* 與輸入框寬度一致 */
+            width: 320px; height: 60px; /* 與輸入框尺寸一致 */
         }
         .btn {
-            width: 100%; /* 填滿 wrapper */
+            width: 100%; height: 100%; /* 填滿 wrapper */
             box-sizing: border-box;
             border: 1px solid rgba(255,255,255,0.4); color: #fff; background-color: rgba(255,255,255,0.05);
-            padding: 18px 0; border-radius: 50px; font-size: 0.9rem; font-weight: 300;
+            padding: 0; margin: 0; border-radius: 50px; font-size: 0.9rem; font-weight: 300; 
+            line-height: 58px; /* 讓文字完美垂直置中 (60px - 上下邊框各1px) */
             cursor: pointer; transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1); letter-spacing: 3px;
             backdrop-filter: blur(10px);
         }
         .upload-btn-wrapper input[type=file] {
-            font-size: 100px; position: absolute; left: 0; top: 0; opacity: 0; cursor: pointer;
+            font-size: 100px; position: absolute; left: 0; top: 0; opacity: 0; cursor: pointer; height: 100%;
         }
         .btn:hover { 
             background-color: #fff; color: #000; 
@@ -69,16 +70,22 @@
 
         @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
 
-        /* 2. 調整每筆資料（卡片）的上下間距為 20px */
-        .column { flex: 1; display: flex; flex-direction: column; gap: 20px; }
+        .column { flex: 1; display: flex; flex-direction: column; }
         
         .column h2 { 
             text-align: center; font-size: 1rem; margin-top: 0; letter-spacing: 3px; font-weight: 400;
-            padding-bottom: 15px; border-bottom: 1px solid rgba(255,255,255,0.1);
+            padding-bottom: 15px; border-bottom: 1px solid rgba(255,255,255,0.1); margin-bottom: 20px;
         }
         .col-design h2 { color: #ff5e5e; text-shadow: 0 0 10px rgba(255,94,94,0.3); }
         .col-personality h2 { color: #ffffff; text-shadow: 0 0 10px rgba(255,255,255,0.2); }
         
+        /* 2. 修正：將間距(gap)直接套用在動態生成卡片的容器上 */
+        #design-list, #personality-list {
+            display: flex;
+            flex-direction: column;
+            gap: 20px; /* 確保卡片之間有 20px 的舒適間距 */
+        }
+
         .data-card {
             background: rgba(255,255,255,0.03); backdrop-filter: blur(15px);
             border: 1px solid rgba(255,255,255,0.08); border-radius: 15px;
