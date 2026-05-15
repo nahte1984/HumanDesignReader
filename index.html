@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>HDReader v0.6.1</title>
+    <style>
+        body, html {
+            margin: 0; padding: 0; width: 100%; min-height: 100vh;
+            background: radial-gradient(circle at center, #754e79 0%, #130614 100%);
+            color: #fff; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            display: flex; flex-direction: column; align-items: center;
+        }
+
+        header { margin-top: 10vh; text-align: center; width: 90%; max-width: 600px; }
+        h1 { font-weight: 200; letter-spacing: 4px; color: #eaa2ff; text-transform: uppercase; margin-bottom: 40px; }
+        
+        .upload-btn-wrapper { position: relative; overflow: hidden; display: inline-block; }
+        .btn {
+            border: 1px solid rgba(255,255,255,0.4); color: #fff; background-color: rgba(255,255,255,0.05);
+            padding: 20px 60px; border-radius: 50px; font-size: 0.9rem; font-weight: 300;
+            cursor: pointer; transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1); letter-spacing: 3px;
+            backdrop-filter: blur(10px);
+        }
+        .upload-btn-wrapper input[type=file] {
+            font-size: 100px; position: absolute; left: 0; top: 0; opacity: 0; cursor: pointer;
+        }
+        .btn:hover { 
+            background-color: #fff; color: #000; 
+            box-shadow: 0 0 50px rgba(234, 162, 255, 0.3);
+            transform: translateY(-2px);
+        }
+
+        #status { margin-top: 30px; font-family: monospace; color: rgba(255,255,255,0.4); min-height: 20px; font-size: 0.75rem; letter-spacing: 1px; }
+
+        .results-container {
+            display: flex; flex-direction: column; gap: 30px; margin-top: 40px; margin-bottom: 60px; 
+            width: 90%; max-width: 1000px; display: none;
+            animation: fadeIn 1s ease-out;
+        }
+        
+        @media (min-width: 768px) {
+            .results-container { flex-direction: row; }
+        }
+
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+
+        .column { flex: 1; display: flex; flex-direction: column; gap: 15px; }
+        
+        .column h2 { 
+            text-align: center; font-size: 1rem; margin-top: 0; letter-spacing: 3px; font-weight: 400;
+            padding-bottom: 15px; border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        .col-design h2 { color: #ff5e5e; text-shadow: 0 0 10px rgba(255,94,94,0.3); }
+        .col-personality h2 { color: #ffffff; text-shadow: 0 0 10px rgba(255,255,255,0.2); }
+        
+        .data-card {
+            background: rgba(255,255,255,0.03); backdrop-filter: blur(15px);
+            border: 1px solid rgba(255,255,255,0.08); border-radius: 15px;
+            padding: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            transition: transform 0.3s;
+        }
+        .data-card:hover { transform: translateY(-3px); border-color: rgba(234, 162, 255, 0.4); }
+        
+        .card-number {
+            font-family: 'Courier New', Courier, monospace; font-size: 1.5rem; font-weight: bold;
+            border-bottom: 1px dashed rgba(255,255,255,0.2); padding-bottom: 10px; margin-bottom: 15px;
+        }
+        .col-design .card-number { color: #ff5e5e; }
+        .col-personality .card-number { color: #81fffb; }
+
+        .card-text {
+            font-size: 0.9rem; line-height: 1.8; color: rgba(255,255,255,0.8);
+            white-space: pre-wrap; 
+        }
+        
+        .empty-state { color: rgba(255,255,255,0.3); font-style: italic; font-size: 0.85rem; }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>🔮 🔮 🔮</h1>
+        
+        <div class="upload-btn-wrapper">
+            <button class="btn">SELECT CHART</button>
+            <input type="file" id="image-upload" accept="image/*" />
+        </div>
+        <div id="status">Ready. Checking database...</div>
+    </header>
+
+    <div class="results-container" id="results">
+        <div class="column col-design">
+            <h2>DESIGN</h2>
+            <div id="design-list"></div>
+        </div>
+        <div class="column col-personality">
+            <h2>PERSONALITY</h2>
+            <div id="personality-list"></div>
+        </div>
+    </div>
+
+    <script>
+        // --- 請將你的 API Key 填入下方的引號內 ---
+        const API_KEY = "xxx"; 
+
+        // 建立一個空的資料庫容器
+        let chartDatabase = {};
+        const statusText = document.getElementById('status');
+
+        // --- 網頁載入時，先去抓取同一資料夾下的 chartDatabase.json ---
+        fetch('./chartDatabase.json')
+            .then(response => {
+                if (!response.ok) throw new Error("JSON file not found");
+                return response.json();
+            })
+            .then(data => {
+                chartDatabase = data;
+                statusText.innerText = `Database loaded: ${Object.keys(chartDatabase).length} records ready.`;
+            })
+            .catch(err => {
+                console.error("無法載入資料庫：", err);
+                statusText.innerText = "Warning: Failed to load chartDatabase.json. Please run on a local server.";
+                statusText.style.color = "#ff4d4d";
+            });
+
+        const uploadInput = document.getElementById('image-upload');
+        const resultsContainer = document.getElementById('results');
+        const designList = document.getElementById('design-list');
+        const personalityList = document.getElementById('personality-list');
+
+        uploadInput.addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            // 如果資料庫還沒載入成功，擋下操作並提醒
+            if (Object.keys(chartDatabase).length === 0) {
+                alert("資料庫尚未載入完成或發生錯誤。請確認有開啟 Local Server！");
+                return;
+            }
+
+            resultsContainer.style.display = 'none';
+            designList.innerHTML = '';
+            personalityList.innerHTML = '';
+            statusText.innerText = "Initiating neural analysis...";
+            statusText.style.color = "#81fffb";
+
+            try {
+                const base64Image = await getBase64(file);
+                const base64Data = base64Image.split(',')[1];
+                const mimeType = file.type;
+
+                // 1. 自動探索模型
+                const listUrl = `https://generativelanguage.googleapis.com/v1beta/models?key=${API_KEY}`;
+                const listResponse = await fetch(listUrl);
+                const listData = await listResponse.json();
+
+                if (!listData.models) throw new Error("Invalid API Key or Permission denied.");
+
+                let targetModel = listData.models.find(m => m.name.includes("flash") && m.supportedGenerationMethods.includes("generateContent"));
+                if (!targetModel) targetModel = listData.models.find(m => m.name.includes("gemini") && m.supportedGenerationMethods.includes("generateContent"));
+                
+                const modelName = targetModel.name;
+
+                // 2. 發送分析請求
+                const url = `https://generativelanguage.googleapis.com/v1beta/${modelName}:generateContent?key=${API_KEY}`;
+                
+                const prompt = `Extract exactly 13 numbers from the left column (Design, Red) and 13 from the right (Personality, Black). Return ONLY JSON: {"design": ["XX.X", ...], "personality": ["XX.X", ...]}`;
+
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: [{
+                            parts: [
+                                { text: prompt },
+                                { inlineData: { mimeType: mimeType, data: base64Data } }
+                            ]
+                        }]
+                    })
+                });
+
+                if (!response.ok) throw new Error("Analysis failed.");
+
+                const data = await response.json();
+                let textResult = data.candidates[0].content.parts[0].text;
+                const cleanJsonStr = textResult.replace(/```json/g, '').replace(/```/g, '').trim();
+                const parsedData = JSON.parse(cleanJsonStr);
+
+                // 3. 渲染卡片並對接外部讀取的資料庫
+                renderCards(designList, parsedData.design);
+                renderCards(personalityList, parsedData.personality);
+                
+                statusText.innerText = "Sync complete. Data retrieved.";
+                statusText.style.color = "rgba(255,255,255,0.4)";
+                resultsContainer.style.display = 'flex';
+
+            } catch (error) {
+                statusText.innerText = `System Error: ${error.message}`;
+                statusText.style.color = "#ff4d4d";
+            }
+        });
+
+        function getBase64(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.readAsDataURL(file);
+                reader.onload = () => resolve(reader.result);
+                reader.onerror = error => reject(error);
+            });
+        }
+
+        function renderCards(containerElement, numbersArray) {
+            if (!numbersArray) return;
+            
+            numbersArray.forEach(num => {
+                const card = document.createElement('div');
+                card.className = 'data-card';
+                
+                const dbContent = chartDatabase[num];
+                
+                const displayHTML = dbContent 
+                    ? `<div class="card-text">${dbContent}</div>` 
+                    : `<div class="empty-state">Data not found in database.</div>`;
+
+                card.innerHTML = `
+                    <div class="card-number">${num}</div>
+                    ${displayHTML}
+                `;
+                containerElement.appendChild(card);
+            });
+        }
+    </script>
+</body>
+</html>
